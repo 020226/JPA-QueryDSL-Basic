@@ -6,23 +6,40 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.util.Arrays;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
+@ActiveProfiles("test") // initData의 Profile("test")가 활성화됨
 class QdslApplicationTests {
 	@Autowired
 	private UserRepository userRepository;
 
 	@Test
 	@DisplayName("회원 생성")
-	void t1() { // {noop}1234 <- 비밀번호를 암호화하지 않도록(암호화는 {bcrypt}1234, id는 알아서 증가되기 때문에 null
+	void t1() {
+		/*
 		SiteUser u1 = new SiteUser(null, "user1", "{noop}1234", "user1@test.com");
 		SiteUser u2 = new SiteUser(null, "user2", "{noop}1234", "user2@test.com");
+		 */
 
-		userRepository.saveAll(Arrays.asList(u1, u2));
+		SiteUser u3 = SiteUser.builder()
+				.username("user3")
+				.password("{noop}1234")
+				.email("user3@test.com")
+				.build();
+
+		SiteUser u4 = SiteUser.builder()
+				.username("user4")
+				.password("{noop}1234")
+				.email("user4@test.com")
+				.build();
+
+
+		userRepository.saveAll(Arrays.asList(u3, u4));
 	}
 
 	@Test
@@ -35,7 +52,5 @@ class QdslApplicationTests {
 		assertThat(u1.getUsername()).isEqualTo("user1");
 		assertThat(u1.getPassword()).isEqualTo("{noop}1234");
 		assertThat(u1.getEmail()).isEqualTo("user1@test.com");
-
-
 	}
 }
