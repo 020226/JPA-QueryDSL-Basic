@@ -11,6 +11,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.util.ArrayList;
@@ -20,21 +21,16 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
-@Transactional // 각 테스트케이스에 전부 @Transactional을 붙인 효과
+@Transactional // 각 테스트케이스에 전부 @Transactional을 붙인 것과 같은 효과
 // @Test + @Transactional 조합은 자동으로 롤백을 유발시킨다.
-@ActiveProfiles("test") // initData의 Profile("test")가 활성화됨
-class QdslApplicationTests {
+@ActiveProfiles("test")
+class QslTutorialApplicationTests {
 	@Autowired
 	private UserRepository userRepository;
 
 	@Test
 	@DisplayName("회원 생성")
 	void t1() {
-		/*
-		SiteUser u1 = new SiteUser(null, "user1", "{noop}1234", "user1@test.com");
-		SiteUser u2 = new SiteUser(null, "user2", "{noop}1234", "user2@test.com");
-		 */
-
 		SiteUser u3 = SiteUser.builder()
 				.username("user3")
 				.password("{noop}1234")
@@ -47,7 +43,6 @@ class QdslApplicationTests {
 				.email("user4@test.com")
 				.build();
 
-
 		userRepository.saveAll(Arrays.asList(u3, u4));
 	}
 
@@ -57,10 +52,22 @@ class QdslApplicationTests {
 		// SELECT * FROM site_user WHERE id = 1;
 		SiteUser u1 = userRepository.getQslUser(1L);
 
-		assertThat(u1.getId()).isEqualTo(1L); // id가 1인지 확인
+		assertThat(u1.getId()).isEqualTo(1L);
 		assertThat(u1.getUsername()).isEqualTo("user1");
 		assertThat(u1.getPassword()).isEqualTo("{noop}1234");
 		assertThat(u1.getEmail()).isEqualTo("user1@test.com");
+	}
+
+	@Test
+	@DisplayName("2번 회원을 Qsl로 가져오기")
+	void t3() {
+		// SELECT * FROM site_user WHERE id = 2;
+		SiteUser u2 = userRepository.getQslUser(2L);
+
+		assertThat(u2.getId()).isEqualTo(2L);
+		assertThat(u2.getUsername()).isEqualTo("user2");
+		assertThat(u2.getPassword()).isEqualTo("{noop}1234");
+		assertThat(u2.getEmail()).isEqualTo("user2@test.com");
 	}
 
 	@Test
@@ -75,6 +82,7 @@ class QdslApplicationTests {
 	@DisplayName("가장 오래된 회원 1명")
 	void t5() {
 		SiteUser u1 = userRepository.getQslUserOrderByIdAscOne();
+
 		assertThat(u1.getId()).isEqualTo(1L);
 		assertThat(u1.getUsername()).isEqualTo("user1");
 		assertThat(u1.getPassword()).isEqualTo("{noop}1234");
@@ -85,13 +93,16 @@ class QdslApplicationTests {
 	@DisplayName("전체 회원, 오래된 순")
 	void t6() {
 		List<SiteUser> users = userRepository.getQslUserOrderByIdAsc();
+
 		SiteUser u1 = users.get(0);
+
 		assertThat(u1.getId()).isEqualTo(1L);
 		assertThat(u1.getUsername()).isEqualTo("user1");
 		assertThat(u1.getPassword()).isEqualTo("{noop}1234");
 		assertThat(u1.getEmail()).isEqualTo("user1@test.com");
 
 		SiteUser u2 = users.get(1);
+
 		assertThat(u2.getId()).isEqualTo(2L);
 		assertThat(u2.getUsername()).isEqualTo("user2");
 		assertThat(u2.getPassword()).isEqualTo("{noop}1234");
@@ -181,12 +192,12 @@ class QdslApplicationTests {
 	void t9() {
 		long totalCount = userRepository.count();
 		int pageSize = 1; // 한 페이지에 보여줄 아이템 개수
-		int totalPages = (int)Math.ceil(totalCount / (double)pageSize);
+		int totalPages = (int)Math.ceil(totalCount / (double)pageSize); // 전체 페이지
 		int page = 1; // 현재 페이지 -> 2번 째 페이지를 의미
 		String kw = "user";
 
 		List<Sort.Order> sorts = new ArrayList<>();
-		sorts.add(Sort.Order.asc("id")); // id 기준 오름차순
+		sorts.add(Sort.Order.desc("id")); // id 기준 내림차순
 		Pageable pageable = PageRequest.of(page, pageSize, Sort.by(sorts)); // 한 페이지당 몇 개까지 보여질 것인가
 		Page<SiteUser> usersPage = userRepository.searchQsl(kw, pageable);
 
@@ -200,9 +211,52 @@ class QdslApplicationTests {
 		// page 값이 1 == 2번째 페이지를 의미
 		// 2번째 페이지는 1번 회원이 나와야 함
 		SiteUser u = users.get(0);
+
 		assertThat(u.getId()).isEqualTo(1L);
 		assertThat(u.getUsername()).isEqualTo("user1");
 		assertThat(u.getPassword()).isEqualTo("{noop}1234");
 		assertThat(u.getEmail()).isEqualTo("user1@test.com");
+	}
+
+	@Test
+	@DisplayName("회원에게 관심사를 등록할 수 있다.")
+	@Rollback(false)
+	void t10() {
+		SiteUser u2 = userRepository.getQslUser(2L);
+		u2.addInterestKeywordContent("테니스");
+		u2.addInterestKeywordContent("오버워치");
+		u2.addInterestKeywordContent("헬스");
+		u2.addInterestKeywordContent("런닝");
+		u2.addInterestKeywordContent("런닝");
+
+		userRepository.save(u2);
+	}
+
+	@Test
+	@DisplayName("런닝에 관심이 있는 회원들 검색")
+	void t11() {
+		List<SiteUser> users = userRepository.getQslUserByInterestKeyword("런닝");
+
+		assertThat(users.size()).isEqualTo(1);
+
+		SiteUser u = users.get(0);
+		assertThat(u.getId()).isEqualTo(2L);
+		assertThat(u.getUsername()).isEqualTo("user2");
+		assertThat(u.getPassword()).isEqualTo("{noop}1234");
+		assertThat(u.getEmail()).isEqualTo("user2@test.com");
+	}
+
+	@Test
+	@DisplayName("no QueryDSL, 테니스에 관심이 있는 회원들 검색")
+	void t12() {
+		List<SiteUser> users = userRepository.findByInterestKeywords_content("테니스");
+
+		assertThat(users.size()).isEqualTo(1);
+
+		SiteUser u = users.get(0);
+		assertThat(u.getId()).isEqualTo(2L);
+		assertThat(u.getUsername()).isEqualTo("user2");
+		assertThat(u.getPassword()).isEqualTo("{noop}1234");
+		assertThat(u.getEmail()).isEqualTo("user2@test.com");
 	}
 }
